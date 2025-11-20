@@ -7,8 +7,8 @@ import type {
 import type { NormalizedFeature } from "./awcTypes"
 import { filterAwcFeatures } from "./filterAwcFeatures"
 
-// Упрощённая фабрика для тестов: принимаем только properties,
-// внутри достраиваем обязательные поля и кастим через any.
+// Simplified factory for tests: we accept only properties,
+// internally fill required fields and cast via any.
 function makeFeature(
 	props: Partial<NormalizedFeature["properties"]> & { id: string }
 ): NormalizedFeature {
@@ -27,7 +27,7 @@ function makeFeature(
 			],
 		},
 		properties: {
-			// базовые значения по умолчанию
+			// default base values
 			id: props.id,
 			type: "SIGMET",
 			rawText: "TEST",
@@ -38,7 +38,7 @@ function makeFeature(
 			validTimeFrom: undefined,
 			validTimeTo: undefined,
 			hazard: undefined,
-			// перекрываем тем, что передали
+			// override with provided values
 			...props,
 		} as any,
 	} as NormalizedFeature
@@ -73,7 +73,7 @@ describe("filterAwcFeatures", () => {
 
 		const result = filterAwcFeatures({
 			all: [sigmet, airmet],
-			layers: { ...baseLayers, showSigmet: false }, // скрываем SIGMET
+			layers: { ...baseLayers, showSigmet: false }, // hide SIGMET
 			altitude: baseAltitude,
 			time: baseTime,
 		})
@@ -97,7 +97,7 @@ describe("filterAwcFeatures", () => {
 		const result = filterAwcFeatures({
 			all: [low, high],
 			layers: baseLayers,
-			altitude: { minFL: 0, maxFL: 200 }, // режем выше FL200
+			altitude: { minFL: 0, maxFL: 200 }, // cut everything above FL200
 			time: baseTime,
 		})
 
@@ -109,14 +109,14 @@ describe("filterAwcFeatures", () => {
 		const now = Date.now()
 		const oneHour = 3600_000
 
-		// Фича, действительная сейчас
+		// Feature that is valid right now
 		const current = makeFeature({
 			id: "current",
 			validTimeFrom: Math.floor((now - oneHour) / 1000),
 			validTimeTo: Math.floor((now + oneHour) / 1000),
 		})
 
-		// Фича, которая была 10–12 часов назад и уже закончилась
+		// Feature from 10–12 hours ago, already expired
 		const past = makeFeature({
 			id: "past",
 			validTimeFrom: Math.floor((now - 12 * oneHour) / 1000),

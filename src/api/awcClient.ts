@@ -13,20 +13,20 @@ export interface IsigmetRecord {
 	hazard?: string | null
 	qualifier?: string | null
 
-	// Время
+	// Time
 	receiptTime?: string
-	validTimeFrom?: number // unixtime (сек)
-	validTimeTo?: number // unixtime (сек)
+	validTimeFrom?: number // unixtime (seconds)
+	validTimeTo?: number // unixtime (seconds)
 
-	// Высота
-	base?: number | null // нижний FL
-	top?: number | null // верхний FL
+	// Altitude
+	base?: number | null // lower FL
+	top?: number | null // upper FL
 
-	// Геометрия
-	geom?: string | null // WKT / или иной формат, если будет нужен
+	// Geometry
+	geom?: string | null // WKT / or another format if needed
 	coords?: AwcCoord[]
 
-	// Текст
+	// Text
 	rawSigmet?: string | null
 
 	[key: string]: any
@@ -38,28 +38,28 @@ export interface AirsigmetRecord {
 
 	hazard?: string | null
 
-	// Время
+	// Time
 	receiptTime?: string
 	creationTime?: string
 	validTimeFrom?: number
 	validTimeTo?: number
 
-	// Высота
+	// Altitude
 	altitudeLow1?: number | null
 	altitudeHi1?: number | null
 	altitudeLow2?: number | null
 	altitudeHi2?: number | null
 
-	// Геометрия
+	// Geometry
 	coords?: AwcCoord[]
 
-	// Текст
+	// Text
 	rawAirSigmet?: string | null
 
 	[key: string]: any
 }
 
-// фронт будет стучаться на наш backend
+// frontend will send requests to our backend
 const BACKEND_BASE = "http://localhost:5000/api"
 
 async function fetchJson<T>(
