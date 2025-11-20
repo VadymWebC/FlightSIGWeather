@@ -1,70 +1,140 @@
-# Getting Started with Create React App
+# Aviation Weather Map
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Interactive web application for visualizing aviation weather advisories (SIGMET, AIRMET, G‑AIRMET) on an interactive map.  
+The app uses MapLibre GL JS, an Express-based proxy backend for the Aviation Weather Center (AWC) API, and client-side filtering by layer, altitude, and time.
 
-## Available Scripts
+---
 
-In the project directory, you can run:
+## Table of Contents
 
-### `npm start`
+1. [Features](#features)
+2. [Architecture Overview](#architecture-overview)
+3. [Tech Stack](#tech-stack)
+4. [Getting Started](#getting-started)
+5. [Application Details](#application-details)
+   - [Map & Visualization](#map--visualization)
+   - [Data Source & Backend Proxy](#data-source--backend-proxy)
+   - [Filtering](#filtering)
+   - [Interactions](#interactions)
+6. [Code Structure](#code-structure)
+7. [Caching Strategy](#caching-strategy)
+8. [Testing](#testing)
+9. [Possible Improvements](#possible-improvements)
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+---
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Features
 
-### `npm test`
+- **Interactive map with aviation weather data**
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+  - MapLibre GL JS with OpenStreetMap raster tiles.
+  - Advisories rendered as GeoJSON polygons on top of the base map.
 
-### `npm run build`
+- **AWC API integration via mini backend**
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+  - Express proxy for AWC endpoints:
+    - `/isigmet`
+    - `/airsigmet`
+  - Normalized GeoJSON output on the client.
+  - In‑memory cache with **1 hour TTL** to reduce API load.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+- **Filtering**
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+  - **Layer toggles** for:
+    - SIGMET
+    - AIRMET
+    - G‑AIRMET
+  - **Altitude range filter**:
+    - 0 – 48,000 ft equivalent range (via FL), adjustable with sliders.
+  - **Time filter**:
+    - From **−24h** to **+6h** relative to current time.
+    - Separate sliders for “from” and “to” offsets.
+  - Filters update the map in real time.
 
-### `npm run eject`
+- **User interactions**
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+  - Clickable polygons:
+    - Popups with detailed advisory information (type, id, raw text, etc.).
+  - Smooth UX:
+    - Instant visual feedback when toggling layers or moving sliders.
+    - Status overlay with loading/error/feature count indicators.
+    - Legend describing color mapping for each layer type.
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+- **Clean, self‑explanatory code**
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+  - React hooks for data fetching and filtering.
+  - Explicit types for normalized data.
+  - Separation of concerns between:
+    - Data layer
+    - Map rendering
+    - UI controls
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+- **Basic unit test coverage**
+  - Pure filtering/normalization logic is covered with unit tests (Jest).
 
-## Learn More
+---
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## Architecture Overview
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+The project is split into **frontend** and **mini-backend**:
 
-### Code Splitting
+- **Frontend (React + MapLibre)**
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+  - Responsible for:
+    - Rendering the map and layers.
+    - Requesting normalized data from the backend proxy.
+    - Applying filters (layer, altitude, time).
+    - Displaying popups and UI controls.
 
-### Analyzing the Bundle Size
+- **Backend (Node.js + Express)**
+  - Responsible for:
+    - Proxying AWC API requests.
+    - Applying a simple in‑memory cache (1h TTL).
+    - Returning raw AWC JSON responses to the client, which then normalizes them into GeoJSON.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+Data flow:
 
-### Making a Progressive Web App
+1. Frontend calls `/api/isigmet` and `/api/airsigmet` on the local Express server.
+2. Express proxies requests to `https://aviationweather.gov/api/data/...`, applying caching per URL.
+3. Frontend normalizes responses into GeoJSON and applies filtering.
+4. Normalized + filtered data is passed to the MapLibre source to render polygons.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+---
 
-### Advanced Configuration
+## Tech Stack
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+**Frontend**
 
-### Deployment
+- React
+- TypeScript
+- MapLibre GL JS
+- OpenStreetMap raster tiles
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+**Backend**
 
-### `npm run build` fails to minify
+- Node.js
+- Express
+- `node-fetch`
+- In‑memory cache (plain `Map`)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+**Testing**
+
+- Jest (or compatible test runner)
+- Unit tests for filtering and normalization utilities
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js (LTS)
+- npm or yarn
+
+### Install dependencies
+
+```bash
+npm install
+# or
+yarn install
+```
