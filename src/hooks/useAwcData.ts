@@ -9,6 +9,7 @@ import type {
 import { filterAwcFeatures } from "../map/filterAwcFeatures"
 
 export type TimeFilterState = {
+	/** Hours relative to "now": [-24, +6] */
 	fromOffsetHours: number
 	toOffsetHours: number
 }
@@ -20,24 +21,40 @@ export type LayerFilterState = {
 }
 
 export type AltitudeFilterState = {
+	/** Minimum flight level (FL) */
 	minFL: number
+	/** Maximum flight level (FL) */
 	maxFL: number
 }
 
 export interface UseAwcDataState {
 	loading: boolean
 	error: string | null
+
+	/** Normalized raw collections (unfiltered) */
 	rawSigmet: NormalizedFeatureCollection | null
 	rawAirsigmet: NormalizedFeatureCollection | null
+
+	/** Filtered feature collection used by the map */
 	filtered: NormalizedFeatureCollection | null
+
+	/** Filters */
 	layers: LayerFilterState
 	altitude: AltitudeFilterState
 	time: TimeFilterState
+
+	/** Filter controls */
 	setLayers: (v: LayerFilterState) => void
 	setAltitude: (v: AltitudeFilterState) => void
 	setTime: (v: TimeFilterState) => void
 }
 
+/**
+ * Main hook for working with AWC data:
+ *  - loads and normalizes SIGMET / AIRMET
+ *  - manages filter state
+ *  - returns filtered GeoJSON for the map
+ */
 export function useAwcData(): UseAwcDataState {
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
@@ -63,10 +80,11 @@ export function useAwcData(): UseAwcDataState {
 		maxFL: 480,
 	})
 
+	// Load and normalize data
 	useEffect(() => {
 		let cancelled = false
 
-		const load = async () => {
+		async function loadAwcData() {
 			try {
 				setLoading(true)
 				setError(null)
@@ -81,34 +99,34 @@ export function useAwcData(): UseAwcDataState {
 				const sigmetNorm = normalizeIsigmet(isigmetRaw)
 				const airsigmetNorm = normalizeAirsigmet(airsigmetRaw)
 
-				console.log("SIGMET example:", sigmetNorm.features[0])
-				console.log("AIRMET example:", airsigmetNorm.features[0])
-
 				setRawSigmet(sigmetNorm)
 				setRawAirsigmet(airsigmetNorm)
 			} catch (err: any) {
-				console.error("Error loading AWC data:", err)
 				if (!cancelled) {
-					setError(err.message || "Failed to load AWC data")
+					console.error("Error loading AWC data:", err)
+					setError(err?.message ?? "Failed to load AWC data")
 				}
 			} finally {
-				if (!cancelled) setLoading(false)
+				if (!cancelled) {
+					setLoading(false)
+				}
 			}
 		}
 
-		load()
+		loadAwcData()
 
 		return () => {
 			cancelled = true
 		}
 	}, [])
 
+	// Apply filters to normalized data
 	const filtered: NormalizedFeatureCollection | null = useMemo(() => {
 		if (!rawSigmet && !rawAirsigmet) return null
 
 		const all: NormalizedFeature[] = [
-			...(rawSigmet?.features || []),
-			...(rawAirsigmet?.features || []),
+			...(rawSigmet?.features ?? []),
+			...(rawAirsigmet?.features ?? []),
 		]
 
 		return filterAwcFeatures({

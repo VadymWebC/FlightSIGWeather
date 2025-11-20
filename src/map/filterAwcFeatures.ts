@@ -13,9 +13,60 @@ export interface FilterParams {
 	time: TimeFilterState
 }
 
+function passesLayerFilter(
+	f: NormalizedFeature,
+	layers: LayerFilterState
+): boolean {
+	const t = f.properties.type
+
+	if (t === "SIGMET" && !layers.showSigmet) return false
+	if (t === "AIRMET" && !layers.showAirmet) return false
+	if (t === "G_AIRMET" && !layers.showGAirmet) return false
+
+	return true
+}
+
+function passesAltitudeFilter(
+	f: NormalizedFeature,
+	altitude: AltitudeFilterState
+): boolean {
+	const { minFL, maxFL } = altitude
+	const min = f.properties.minFlightLevel ?? 0
+	const max = f.properties.maxFlightLevel ?? 480
+
+	if (max < minFL) return false
+	if (min > maxFL) return false
+
+	return true
+}
+
+function passesTimeFilter(
+	f: NormalizedFeature,
+	time: TimeFilterState,
+	now: number
+): boolean {
+	const fromTime = now + time.fromOffsetHours * 3600_000
+	const toTime = now + time.toOffsetHours * 3600_000
+
+	const startSec = f.properties.validTimeFrom ?? f.properties.startTime ?? null
+	const endSec = f.properties.validTimeTo ?? f.properties.endTime ?? startSec
+
+	if (startSec == null || endSec == null) {
+		// нет информации — не режем по времени
+		return true
+	}
+
+	const startMs = startSec * 1000
+	const endMs = endSec * 1000
+
+	if (endMs < fromTime) return false
+	if (startMs > toTime) return false
+
+	return true
+}
+
 /**
  * Применяет фильтры: тип + высота + время к массиву нормализованных фич.
- * Возвращает FeatureCollection, готовый для карты.
  */
 export function filterAwcFeatures({
 	all,
@@ -23,53 +74,17 @@ export function filterAwcFeatures({
 	altitude,
 	time,
 }: FilterParams): NormalizedFeatureCollection {
-	const { showSigmet, showAirmet, showGAirmet } = layers
-	const { minFL, maxFL } = altitude
-
-	// 1) фильтр по типу + высоте
-	const byTypeAndAltitude = all.filter(f => {
-		const t = f.properties.type
-
-		if (t === "SIGMET" && !showSigmet) return false
-		if (t === "AIRMET" && !showAirmet) return false
-		if (t === "G_AIRMET" && !showGAirmet) return false
-
-		const min = f.properties.minFlightLevel ?? 0
-		const max = f.properties.maxFlightLevel ?? 480
-
-		if (max < minFL) return false
-		if (min > maxFL) return false
-
-		return true
-	})
-
-	// 2) фильтр по времени
 	const now = Date.now()
-	const fromTime = now + time.fromOffsetHours * 3600_000
-	const toTime = now + time.toOffsetHours * 3600_000
 
-	const byTypeAltitudeAndTime = byTypeAndAltitude.filter(f => {
-		// validTimeFrom / validTimeTo — unix seconds
-		const startSec =
-			f.properties.validTimeFrom ?? f.properties.startTime ?? null
-		const endSec = f.properties.validTimeTo ?? f.properties.endTime ?? startSec
-
-		if (startSec == null || endSec == null) {
-			// нет информации — не режем по времени
-			return true
-		}
-
-		const startMs = startSec * 1000
-		const endMs = endSec * 1000
-
-		if (endMs < fromTime) return false
-		if (startMs > toTime) return false
-
-		return true
-	})
+	const features = all.filter(
+		f =>
+			passesLayerFilter(f, layers) &&
+			passesAltitudeFilter(f, altitude) &&
+			passesTimeFilter(f, time, now)
+	)
 
 	return {
 		type: "FeatureCollection",
-		features: byTypeAltitudeAndTime,
+		features,
 	}
 }
