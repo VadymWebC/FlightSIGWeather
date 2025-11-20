@@ -21,8 +21,17 @@ const MapView: React.FC = () => {
 	const lastDataRef = useRef<NormalizedFeatureCollection>(emptyFC)
 	const popupRef = useRef<maplibregl.Popup | null>(null)
 
-	const { loading, error, filtered, layers, altitude, setLayers, setAltitude } =
-		useAwcData()
+	const {
+		loading,
+		error,
+		filtered,
+		layers,
+		altitude,
+		time,
+		setLayers,
+		setAltitude,
+		setTime,
+	} = useAwcData()
 
 	// вспомогательная функция: попытаться залить текущие данные в source
 	const applyDataToSource = () => {
@@ -225,8 +234,10 @@ const MapView: React.FC = () => {
 			<FiltersPanel
 				layers={layers}
 				altitude={altitude}
+				time={time}
 				onLayersChange={setLayers}
 				onAltitudeChange={setAltitude}
+				onTimeChange={setTime}
 			/>
 		</div>
 	)
