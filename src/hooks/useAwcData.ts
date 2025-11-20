@@ -52,20 +52,17 @@ export function useAwcData(): UseAwcDataState {
 		toOffsetHours: 6,
 	})
 
-	// фильтры по типу
 	const [layers, setLayers] = useState<LayerFilterState>({
 		showSigmet: true,
 		showAirmet: true,
 		showGAirmet: true,
 	})
 
-	// фильтры по высоте (FL)
 	const [altitude, setAltitude] = useState<AltitudeFilterState>({
 		minFL: 0,
 		maxFL: 480,
 	})
 
-	// загрузка и нормализация
 	useEffect(() => {
 		let cancelled = false
 
@@ -115,13 +112,6 @@ export function useAwcData(): UseAwcDataState {
 			...(rawAirsigmet?.features || []),
 		]
 
-		const typeStats: Record<string, number> = {}
-		for (const f of all) {
-			const t = f.properties.type
-			typeStats[t] = (typeStats[t] || 0) + 1
-		}
-		console.log("AWC type stats:", typeStats)
-
 		const { showSigmet, showAirmet, showGAirmet } = layers
 		const { minFL, maxFL } = altitude
 
@@ -136,7 +126,6 @@ export function useAwcData(): UseAwcDataState {
 			const min = f.properties.minFlightLevel ?? 0
 			const max = f.properties.maxFlightLevel ?? 480
 
-			// пересечение диапазонов [min, max] и [minFL, maxFL]
 			if (max < minFL) return false
 			if (min > maxFL) return false
 
@@ -148,29 +137,20 @@ export function useAwcData(): UseAwcDataState {
 		const fromTime = now + time.fromOffsetHours * 3600_000
 		const toTime = now + time.toOffsetHours * 3600_000
 
-		console.log("TIME FILTER STATE:", time)
-
-		const debugSample = byTypeAndAltitude.slice(0, 5).map(f => ({
-			id: f.properties.id,
-			type: f.properties.type,
-			validTimeFrom: f.properties.validTimeFrom ?? f.properties.startTime,
-			validTimeTo: f.properties.validTimeTo ?? f.properties.endTime,
-		}))
-		console.log("TIME DEBUG SAMPLE:", debugSample)
-
 		const byTypeAltitudeAndTime = byTypeAndAltitude.filter(f => {
-			const startRaw = f.properties.validTimeFrom ?? f.properties.startTime
-			const endRaw =
-				f.properties.validTimeTo ?? f.properties.endTime ?? startRaw
+			// validTimeFrom / validTimeTo — UNIX seconds (см. твой лог)
+			const startSec =
+				f.properties.validTimeFrom ?? f.properties.startTime ?? null
+			const endSec =
+				f.properties.validTimeTo ?? f.properties.endTime ?? startSec
 
-			// если нет валидной даты — НЕ режем фичу (fail-open),
-			// чтобы не убить все полигоны из‑за формата
-			const startMs = startRaw ? Date.parse(startRaw) : NaN
-			const endMs = endRaw ? Date.parse(endRaw) : NaN
-
-			if (Number.isNaN(startMs) || Number.isNaN(endMs)) {
+			if (startSec == null || endSec == null) {
+				// нет информации — не режем по времени
 				return true
 			}
+
+			const startMs = startSec * 1000
+			const endMs = endSec * 1000
 
 			// пересечение интервалов [startMs, endMs] и [fromTime, toTime]
 			if (endMs < fromTime) return false
