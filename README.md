@@ -11,15 +11,6 @@ The app uses MapLibre GL JS, an Express-based proxy backend for the Aviation Wea
 2. [Architecture Overview](#architecture-overview)
 3. [Tech Stack](#tech-stack)
 4. [Getting Started](#getting-started)
-5. [Application Details](#application-details)
-   - [Map & Visualization](#map--visualization)
-   - [Data Source & Backend Proxy](#data-source--backend-proxy)
-   - [Filtering](#filtering)
-   - [Interactions](#interactions)
-6. [Code Structure](#code-structure)
-7. [Caching Strategy](#caching-strategy)
-8. [Testing](#testing)
-9. [Possible Improvements](#possible-improvements)
 
 ---
 
@@ -141,10 +132,11 @@ yarn install
 
 ## Run the backend (AWC proxy server)
 
-````bash
+```bash
 npm run server
 # or
 node server/index.ts
+```
 
 ## Run the frontend
 
@@ -153,4 +145,4 @@ npm start
 # or
 yarn start
 
-````
+```
