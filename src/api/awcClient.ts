@@ -60,7 +60,7 @@ export interface AirsigmetRecord {
 }
 
 // фронт будет стучаться на наш backend
-const BACKEND_BASE = "http://localhost:3000/api"
+const BACKEND_BASE = "http://localhost:5000/api"
 
 async function fetchJson<T>(
 	path: string,
