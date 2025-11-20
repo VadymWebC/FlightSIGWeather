@@ -138,3 +138,19 @@ npm install
 # or
 yarn install
 ```
+
+## Run the backend (AWC proxy server)
+
+````bash
+npm run server
+# or
+node server/index.ts
+
+## Run the frontend
+
+```bash
+npm start
+# or
+yarn start
+
+````
