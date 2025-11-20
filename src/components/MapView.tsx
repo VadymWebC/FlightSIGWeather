@@ -1,24 +1,172 @@
+// src/components/MapView.tsx
 import maplibregl, { Map as MapLibreMap } from "maplibre-gl"
 import "maplibre-gl/dist/maplibre-gl.css"
 import React, { useEffect, useRef } from "react"
 import { useAwcData } from "../hooks/useAwcData"
 import type { NormalizedFeatureCollection } from "../map/awcTypes"
+import { DataStatusOverlay } from "./DataStatusOverlay"
 import { FiltersPanel } from "./FiltersPanel"
+import { Legend } from "./Legend"
 
 const WEATHER_SOURCE_ID = "weather"
 const WEATHER_FILL_LAYER_ID = "weather-fill"
 const WEATHER_OUTLINE_LAYER_ID = "weather-outline"
 
-const emptyFC: NormalizedFeatureCollection = {
+const EMPTY_FEATURE_COLLECTION: NormalizedFeatureCollection = {
 	type: "FeatureCollection",
 	features: [],
+}
+
+/**
+ * Builds HTML content for the feature popup.
+ */
+function buildPopupHtml(properties: Record<string, any>): string {
+	const type = properties.type ?? "UNKNOWN"
+	const id = properties.id ?? properties.icaoId ?? ""
+	const rawText = properties.rawText ?? properties.text ?? ""
+
+	// Truncate long text to avoid overflow
+	const shortText =
+		typeof rawText === "string" && rawText.length > 600
+			? rawText.slice(0, 600) + "…"
+			: rawText
+
+	return `
+    <div style="max-width: 320px; font-size: 12px;">
+      <div style="font-weight: 600; margin-bottom: 4px;">
+        ${type}${id ? ` — ${id}` : ""}
+      </div>
+      ${
+				shortText
+					? `<pre style="white-space: pre-wrap; margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">${shortText}</pre>`
+					: "<div>No text</div>"
+			}
+    </div>
+  `
+}
+
+/**
+ * Attaches click handler to the weather layer for displaying popups.
+ */
+function attachFeatureClickHandler(
+	map: MapLibreMap,
+	layerId: string,
+	popupRef: React.MutableRefObject<maplibregl.Popup | null>
+) {
+	map.on("click", layerId, e => {
+		const feature = e.features?.[0]
+		if (!feature) return
+
+		const props = feature.properties ?? {}
+		const html = buildPopupHtml(props)
+		const lngLat = e.lngLat
+
+		// Reuse existing popup if available
+		if (!popupRef.current) {
+			popupRef.current = new maplibregl.Popup({
+				closeButton: true,
+				closeOnClick: true,
+				maxWidth: "320px",
+			})
+		}
+
+		popupRef.current.setLngLat(lngLat).setHTML(html).addTo(map)
+	})
+}
+
+/**
+ * Attaches cursor change handlers for the weather layer.
+ */
+function attachCursorHandlers(map: MapLibreMap, layerId: string) {
+	map.on("mouseenter", layerId, () => {
+		map.getCanvas().style.cursor = "pointer"
+	})
+	map.on("mouseleave", layerId, () => {
+		map.getCanvas().style.cursor = ""
+	})
+}
+
+/**
+ * Creates the map style with OSM tiles.
+ */
+function createMapStyle() {
+	return {
+		version: 8 as const,
+		sources: {
+			osm: {
+				type: "raster" as const,
+				tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+				tileSize: 256,
+				attribution: "© OpenStreetMap contributors",
+			},
+		},
+		layers: [
+			{
+				id: "osm",
+				type: "raster" as const,
+				source: "osm",
+			},
+		],
+	}
+}
+
+/**
+ * Adds weather source and layers to the map.
+ */
+function setupWeatherLayers(map: MapLibreMap) {
+	map.addSource(WEATHER_SOURCE_ID, {
+		type: "geojson",
+		data: EMPTY_FEATURE_COLLECTION as any,
+	})
+
+	map.addLayer({
+		id: WEATHER_FILL_LAYER_ID,
+		type: "fill",
+		source: WEATHER_SOURCE_ID,
+		paint: {
+			"fill-color": [
+				"match",
+				["get", "type"],
+				"SIGMET",
+				"#ef4444",
+				"AIRMET",
+				"#f97316",
+				"G_AIRMET",
+				"#3b82f6",
+				"#a3a3a3",
+			],
+			"fill-opacity": 0.4,
+		},
+	})
+
+	map.addLayer({
+		id: WEATHER_OUTLINE_LAYER_ID,
+		type: "line",
+		source: WEATHER_SOURCE_ID,
+		paint: {
+			"line-color": [
+				"match",
+				["get", "type"],
+				"SIGMET",
+				"#b91c1c",
+				"AIRMET",
+				"#c2410c",
+				"G_AIRMET",
+				"#1d4ed8",
+				"#4b5563",
+			],
+			"line-width": 1.2,
+		},
+	})
 }
 
 const MapView: React.FC = () => {
 	const mapContainer = useRef<HTMLDivElement>(null)
 	const mapRef = useRef<MapLibreMap | null>(null)
 	const weatherReadyRef = useRef(false)
-	const lastDataRef = useRef<NormalizedFeatureCollection>(emptyFC)
+	const lastDataRef = useRef<NormalizedFeatureCollection>(
+		EMPTY_FEATURE_COLLECTION
+	)
 	const popupRef = useRef<maplibregl.Popup | null>(null)
 
 	const {
@@ -33,11 +181,12 @@ const MapView: React.FC = () => {
 		setTime,
 	} = useAwcData()
 
-	// вспомогательная функция: попытаться залить текущие данные в source
+	/**
+	 * Applies current data to the weather GeoJSON source.
+	 */
 	const applyDataToSource = () => {
 		const map = mapRef.current
-		if (!map) return
-		if (!weatherReadyRef.current) return
+		if (!map || !weatherReadyRef.current) return
 
 		const src = map.getSource(WEATHER_SOURCE_ID) as
 			| maplibregl.GeoJSONSource
@@ -45,39 +194,17 @@ const MapView: React.FC = () => {
 		if (!src) return
 
 		const data = lastDataRef.current
-		console.log(
-			"APPLY DATA TO WEATHER SOURCE:",
-			data.features.length,
-			"features"
-		)
 		src.setData(data as any)
 	}
 
-	// инициализация карты
+	// Initialize map
 	useEffect(() => {
 		const container = mapContainer.current
 		if (!container) return
 
 		const map = new maplibregl.Map({
 			container,
-			style: {
-				version: 8,
-				sources: {
-					osm: {
-						type: "raster",
-						tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-						tileSize: 256,
-						attribution: "© OpenStreetMap contributors",
-					},
-				},
-				layers: [
-					{
-						id: "osm",
-						type: "raster",
-						source: "osm",
-					},
-				],
-			},
+			style: createMapStyle(),
 			center: [0, 20],
 			zoom: 2,
 		})
@@ -85,103 +212,9 @@ const MapView: React.FC = () => {
 		mapRef.current = map
 
 		map.on("load", () => {
-			map.addSource(WEATHER_SOURCE_ID, {
-				type: "geojson",
-				data: emptyFC as any,
-			})
-
-			map.addLayer({
-				id: WEATHER_FILL_LAYER_ID,
-				type: "fill",
-				source: WEATHER_SOURCE_ID,
-				paint: {
-					"fill-color": [
-						"match",
-						["get", "type"],
-						"SIGMET",
-						"#ef4444", // ярко-красный
-						"AIRMET",
-						"#f97316", // ярко-оранжевый
-						"G_AIRMET",
-						"#3b82f6", // ярко-синий
-						"#a3a3a3", // default
-					],
-					"fill-opacity": 0.4,
-				},
-			})
-
-			map.addLayer({
-				id: WEATHER_OUTLINE_LAYER_ID,
-				type: "line",
-				source: WEATHER_SOURCE_ID,
-				paint: {
-					"line-color": [
-						"match",
-						["get", "type"],
-						"SIGMET",
-						"#b91c1c",
-						"AIRMET",
-						"#c2410c",
-						"G_AIRMET",
-						"#1d4ed8",
-						"#4b5563",
-					],
-					"line-width": 1.2,
-				},
-			})
-
-			// обработка клика по полигонам
-			map.on("click", WEATHER_FILL_LAYER_ID, e => {
-				const feature = e.features && e.features[0]
-				if (!feature) return
-
-				const props = feature.properties || {}
-
-				const type = props.type || "UNKNOWN"
-				const id = props.id || props.icaoId || ""
-				const rawText = props.rawText || props.text || ""
-
-				// чуть подрежем текст, чтобы не улетать на экран
-				const shortText =
-					typeof rawText === "string" && rawText.length > 600
-						? rawText.slice(0, 600) + "…"
-						: rawText
-
-				const html = `
-    <div style="max-width: 320px; font-size: 12px;">
-      <div style="font-weight: 600; margin-bottom: 4px;">
-        ${type}${id ? ` — ${id}` : ""}
-      </div>
-      ${
-				shortText
-					? `<pre style="white-space: pre-wrap; margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">${shortText}</pre>`
-					: "<div>No text</div>"
-			}
-    </div>
-  `
-
-				// определяем координату клика
-				const lngLat = e.lngLat
-
-				// если popup уже есть — переиспользуем
-				if (!popupRef.current) {
-					popupRef.current = new maplibregl.Popup({
-						closeButton: true,
-						closeOnClick: true,
-						maxWidth: "320px",
-					})
-				}
-
-				popupRef.current.setLngLat(lngLat).setHTML(html).addTo(map)
-			})
-
-			// меняем курсор при наведении
-			map.on("mouseenter", WEATHER_FILL_LAYER_ID, () => {
-				map.getCanvas().style.cursor = "pointer"
-			})
-			map.on("mouseleave", WEATHER_FILL_LAYER_ID, () => {
-				map.getCanvas().style.cursor = ""
-			})
+			setupWeatherLayers(map)
+			attachFeatureClickHandler(map, WEATHER_FILL_LAYER_ID, popupRef)
+			attachCursorHandlers(map, WEATHER_FILL_LAYER_ID)
 
 			weatherReadyRef.current = true
 			applyDataToSource()
@@ -195,42 +228,32 @@ const MapView: React.FC = () => {
 			map.remove()
 			mapRef.current = null
 			weatherReadyRef.current = false
-			lastDataRef.current = emptyFC
+			lastDataRef.current = EMPTY_FEATURE_COLLECTION
 		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [])
 
-	// обновление lastDataRef и попытка применить данные
+	// Update data when filtered changes
 	useEffect(() => {
-		const data: NormalizedFeatureCollection = filtered ?? emptyFC
+		const data: NormalizedFeatureCollection =
+			filtered ?? EMPTY_FEATURE_COLLECTION
 		lastDataRef.current = data
 		applyDataToSource()
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [filtered])
+
+	const featureCount = filtered?.features.length ?? 0
 
 	return (
 		<div style={{ position: "relative", width: "100%", height: "100%" }}>
 			<div ref={mapContainer} className="map-container" />
 
-			<div
-				style={{
-					position: "absolute",
-					top: 8,
-					left: 8,
-					padding: "6px 10px",
-					background: "rgba(15,23,42,0.8)",
-					color: "white",
-					fontSize: 12,
-					borderRadius: 4,
-					zIndex: 1,
-				}}
-			>
-				{loading && <div>Loading AWC data…</div>}
-				{error && <div style={{ color: "#f97373" }}>Error: {error}</div>}
-				{!loading && !error && filtered && (
-					<div>Features: {filtered.features.length}</div>
-				)}
-			</div>
+			<DataStatusOverlay
+				loading={loading}
+				error={error}
+				featureCount={featureCount}
+			/>
 
-			{/* Панель фильтров */}
 			<FiltersPanel
 				layers={layers}
 				altitude={altitude}
@@ -239,6 +262,8 @@ const MapView: React.FC = () => {
 				onAltitudeChange={setAltitude}
 				onTimeChange={setTime}
 			/>
+
+			<Legend />
 		</div>
 	)
 }
