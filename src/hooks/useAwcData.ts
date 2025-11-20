@@ -120,6 +120,15 @@ export function useAwcData(): UseAwcDataState {
 		}
 	}, [])
 
+	// Normalize altitude range: if min > max, swap them
+	const normalizedAltitude = useMemo(() => {
+		const { minFL, maxFL } = altitude
+		if (minFL > maxFL) {
+			return { minFL: maxFL, maxFL: minFL }
+		}
+		return altitude
+	}, [altitude])
+
 	// Apply filters to normalized data
 	const filtered: NormalizedFeatureCollection | null = useMemo(() => {
 		if (!rawSigmet && !rawAirsigmet) return null
@@ -132,10 +141,10 @@ export function useAwcData(): UseAwcDataState {
 		return filterAwcFeatures({
 			all,
 			layers,
-			altitude,
+			altitude: normalizedAltitude,
 			time,
 		})
-	}, [rawSigmet, rawAirsigmet, layers, altitude, time])
+	}, [rawSigmet, rawAirsigmet, layers, normalizedAltitude, time])
 
 	return {
 		loading,

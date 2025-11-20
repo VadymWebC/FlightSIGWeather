@@ -30,10 +30,29 @@ function passesAltitudeFilter(
 	f: NormalizedFeature,
 	altitude: AltitudeFilterState
 ): boolean {
-	const { minFL, maxFL } = altitude
-	const min = f.properties.minFlightLevel ?? 0
-	const max = f.properties.maxFlightLevel ?? 480
+	let { minFL, maxFL } = altitude
 
+	// Normalize range: if min > max, swap them
+	if (minFL > maxFL) {
+		const tmp = minFL
+		minFL = maxFL
+		maxFL = tmp
+	}
+
+	const featMin = f.properties.minFlightLevel
+	const featMax = f.properties.maxFlightLevel
+
+	// If feature has no altitude information, exclude it from results
+	// (otherwise altitude filter won't work properly)
+	if (featMin == null && featMax == null) {
+		return false
+	}
+
+	// Interpret missing bounds as extremes
+	const min = featMin ?? 0
+	const max = featMax ?? 480
+
+	// Check if ranges overlap: [min, max] ∩ [minFL, maxFL]
 	if (max < minFL) return false
 	if (min > maxFL) return false
 
@@ -52,7 +71,7 @@ function passesTimeFilter(
 	const endSec = f.properties.validTimeTo ?? f.properties.endTime ?? startSec
 
 	if (startSec == null || endSec == null) {
-		// нет информации — не режем по времени
+		// No time information — don't filter by time
 		return true
 	}
 
@@ -66,7 +85,7 @@ function passesTimeFilter(
 }
 
 /**
- * Применяет фильтры: тип + высота + время к массиву нормализованных фич.
+ * Applies filters: type + altitude + time to an array of normalized features.
  */
 export function filterAwcFeatures({
 	all,
