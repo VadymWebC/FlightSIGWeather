@@ -3,6 +3,7 @@ import "maplibre-gl/dist/maplibre-gl.css"
 import React, { useEffect, useRef } from "react"
 import { useAwcData } from "../hooks/useAwcData"
 import type { NormalizedFeatureCollection } from "../map/awcTypes"
+import { FiltersPanel } from "./FiltersPanel"
 
 const WEATHER_SOURCE_ID = "weather"
 const WEATHER_FILL_LAYER_ID = "weather-fill"
@@ -20,7 +21,8 @@ const MapView: React.FC = () => {
 	const lastDataRef = useRef<NormalizedFeatureCollection>(emptyFC)
 	const popupRef = useRef<maplibregl.Popup | null>(null)
 
-	const { loading, error, filtered } = useAwcData()
+	const { loading, error, filtered, layers, altitude, setLayers, setAltitude } =
+		useAwcData()
 
 	// вспомогательная функция: попытаться залить текущие данные в source
 	const applyDataToSource = () => {
@@ -218,6 +220,14 @@ const MapView: React.FC = () => {
 					<div>Features: {filtered.features.length}</div>
 				)}
 			</div>
+
+			{/* Панель фильтров */}
+			<FiltersPanel
+				layers={layers}
+				altitude={altitude}
+				onLayersChange={setLayers}
+				onAltitudeChange={setAltitude}
+			/>
 		</div>
 	)
 }

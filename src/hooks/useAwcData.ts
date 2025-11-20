@@ -7,6 +7,12 @@ import type {
 	NormalizedFeatureCollection,
 } from "../map/awcTypes"
 
+// часы относительно "сейчас", в диапазоне [-24, +6]
+export type TimeFilterState = {
+	fromOffsetHours: number
+	toOffsetHours: number
+}
+
 export type LayerFilterState = {
 	showSigmet: boolean
 	showAirmet: boolean
@@ -26,8 +32,10 @@ export interface UseAwcDataState {
 	filtered: NormalizedFeatureCollection | null
 	layers: LayerFilterState
 	altitude: AltitudeFilterState
+	time: TimeFilterState
 	setLayers: (v: LayerFilterState) => void
 	setAltitude: (v: AltitudeFilterState) => void
+	setTime: (v: TimeFilterState) => void
 }
 
 export function useAwcData(): UseAwcDataState {
@@ -39,13 +47,19 @@ export function useAwcData(): UseAwcDataState {
 	const [rawAirsigmet, setRawAirsigmet] =
 		useState<NormalizedFeatureCollection | null>(null)
 
-	// фильтры
+	const [time, setTime] = useState<TimeFilterState>({
+		fromOffsetHours: -24,
+		toOffsetHours: 6,
+	})
+
+	// фильтры по типу
 	const [layers, setLayers] = useState<LayerFilterState>({
 		showSigmet: true,
 		showAirmet: true,
 		showGAirmet: true,
 	})
 
+	// фильтры по высоте (FL)
 	const [altitude, setAltitude] = useState<AltitudeFilterState>({
 		minFL: 0,
 		maxFL: 480,
@@ -92,7 +106,7 @@ export function useAwcData(): UseAwcDataState {
 		}
 	}, [])
 
-	// применение фильтров (тип + высота)
+	// применение фильтров (тип + высота + время)
 	const filtered: NormalizedFeatureCollection | null = useMemo(() => {
 		if (!rawSigmet && !rawAirsigmet) return null
 
@@ -104,6 +118,7 @@ export function useAwcData(): UseAwcDataState {
 		const { showSigmet, showAirmet, showGAirmet } = layers
 		const { minFL, maxFL } = altitude
 
+		// сначала фильтруем по типу и высоте
 		const byTypeAndAltitude = all.filter(f => {
 			const t = f.properties.type
 
@@ -114,18 +129,38 @@ export function useAwcData(): UseAwcDataState {
 			const min = f.properties.minFlightLevel ?? 0
 			const max = f.properties.maxFlightLevel ?? 480
 
-			// пересечение диапазонов [min,max] и [minFL,maxFL]
+			// пересечение диапазонов [min, max] и [minFL, maxFL]
 			if (max < minFL) return false
 			if (min > maxFL) return false
 
 			return true
 		})
 
+		// затем фильтруем по времени
+		const now = Date.now()
+		const fromTime = now + time.fromOffsetHours * 3600_000
+		const toTime = now + time.toOffsetHours * 3600_000
+
+		const byTypeAltitudeAndTime = byTypeAndAltitude.filter(f => {
+			const startRaw = f.properties.validTimeFrom ?? f.properties.startTime
+			const endRaw =
+				f.properties.validTimeTo ?? f.properties.endTime ?? startRaw
+
+			const startMs = startRaw ? new Date(startRaw).getTime() : now
+			const endMs = endRaw ? new Date(endRaw).getTime() : startMs
+
+			// пересечение интервалов [startMs, endMs] и [fromTime, toTime]
+			if (endMs < fromTime) return false
+			if (startMs > toTime) return false
+
+			return true
+		})
+
 		return {
 			type: "FeatureCollection",
-			features: byTypeAndAltitude,
+			features: byTypeAltitudeAndTime,
 		}
-	}, [rawSigmet, rawAirsigmet, layers, altitude])
+	}, [rawSigmet, rawAirsigmet, layers, altitude, time])
 
 	return {
 		loading,
@@ -135,7 +170,9 @@ export function useAwcData(): UseAwcDataState {
 		filtered,
 		layers,
 		altitude,
+		time,
 		setLayers,
 		setAltitude,
+		setTime,
 	}
 }
