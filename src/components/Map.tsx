@@ -7,7 +7,7 @@ const Map: React.FC = () => {
 	const map = useRef<maplibregl.Map | null>(null)
 
 	useEffect(() => {
-		// подождать, пока контейнер реально есть
+		// wait until the container is actually exist
 		const container = mapContainer.current
 		if (!container) return
 
