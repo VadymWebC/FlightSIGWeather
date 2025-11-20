@@ -67,10 +67,6 @@ export function normalizeIsigmet(
 ): NormalizedFeatureCollection {
 	const features: NormalizedFeature[] = []
 
-	if (records.length > 0) {
-		console.log("FULL ISIGMET REC EXAMPLE:", records[0])
-	}
-
 	for (const rec of records) {
 		// тут — ПОЛИГОН, а не Point
 		const geom = coordsToPolygon(rec.coords as any)
@@ -111,10 +107,6 @@ export function normalizeAirsigmet(
 	records: AirsigmetRecord[]
 ): NormalizedFeatureCollection {
 	const features: NormalizedFeature[] = []
-
-	if (records.length > 0) {
-		console.log("FULL AIRSIGMET REC EXAMPLE:", records[0])
-	}
 
 	for (const rec of records) {
 		const geom = coordsToPolygon(rec.coords as any)
