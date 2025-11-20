@@ -70,6 +70,9 @@ export function useAwcData(): UseAwcDataState {
 				const sigmetNorm = normalizeIsigmet(isigmetRaw)
 				const airsigmetNorm = normalizeAirsigmet(airsigmetRaw)
 
+				console.log("SIGMET example:", sigmetNorm.features[0])
+				console.log("AIRMET example:", airsigmetNorm.features[0])
+
 				setRawSigmet(sigmetNorm)
 				setRawAirsigmet(airsigmetNorm)
 			} catch (err: any) {
