@@ -3,7 +3,11 @@ import maplibregl, { Map as MapLibreMap } from "maplibre-gl"
 import "maplibre-gl/dist/maplibre-gl.css"
 import React, { useEffect, useRef } from "react"
 import { useAwcData } from "../hooks/useAwcData"
-import type { NormalizedFeatureCollection } from "../map/awcTypes"
+import type {
+	NormalizedFeatureCollection,
+	NormalizedWeatherFeatureProperties,
+} from "../map/awcTypes"
+import { buildPopupHtml } from "../map/buildPopupHtml"
 import { DataStatusOverlay } from "./DataStatusOverlay"
 import { FiltersPanel } from "./FiltersPanel"
 import { Legend } from "./Legend"
@@ -18,34 +22,6 @@ const EMPTY_FEATURE_COLLECTION: NormalizedFeatureCollection = {
 }
 
 /**
- * Builds HTML content for the feature popup.
- */
-function buildPopupHtml(properties: Record<string, any>): string {
-	const type = properties.type ?? "UNKNOWN"
-	const id = properties.id ?? properties.icaoId ?? ""
-	const rawText = properties.rawText ?? properties.text ?? ""
-
-	// Truncate long text to avoid overflow
-	const shortText =
-		typeof rawText === "string" && rawText.length > 600
-			? rawText.slice(0, 600) + "…"
-			: rawText
-
-	return `
-    <div style="max-width: 320px; font-size: 12px;">
-      <div style="font-weight: 600; margin-bottom: 4px;">
-        ${type}${id ? ` — ${id}` : ""}
-      </div>
-      ${
-				shortText
-					? `<pre style="white-space: pre-wrap; margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">${shortText}</pre>`
-					: "<div>No text</div>"
-			}
-    </div>
-  `
-}
-
-/**
  * Attaches click handler to the weather layer for displaying popups.
  */
 function attachFeatureClickHandler(
@@ -57,7 +33,8 @@ function attachFeatureClickHandler(
 		const feature = e.features?.[0]
 		if (!feature) return
 
-		const props = feature.properties ?? {}
+		const props = (feature.properties ??
+			{}) as NormalizedWeatherFeatureProperties
 		const html = buildPopupHtml(props)
 		const lngLat = e.lngLat
 
@@ -66,7 +43,8 @@ function attachFeatureClickHandler(
 			popupRef.current = new maplibregl.Popup({
 				closeButton: true,
 				closeOnClick: true,
-				maxWidth: "320px",
+				// maxWidth: "320px", // не обязательно, max-width задаём в HTML
+				offset: 12,
 			})
 		}
 
