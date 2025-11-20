@@ -115,10 +115,17 @@ export function useAwcData(): UseAwcDataState {
 			...(rawAirsigmet?.features || []),
 		]
 
+		const typeStats: Record<string, number> = {}
+		for (const f of all) {
+			const t = f.properties.type
+			typeStats[t] = (typeStats[t] || 0) + 1
+		}
+		console.log("AWC type stats:", typeStats)
+
 		const { showSigmet, showAirmet, showGAirmet } = layers
 		const { minFL, maxFL } = altitude
 
-		// сначала фильтруем по типу и высоте
+		// 1) тип + высота
 		const byTypeAndAltitude = all.filter(f => {
 			const t = f.properties.type
 
@@ -136,18 +143,34 @@ export function useAwcData(): UseAwcDataState {
 			return true
 		})
 
-		// затем фильтруем по времени
+		// 2) время
 		const now = Date.now()
 		const fromTime = now + time.fromOffsetHours * 3600_000
 		const toTime = now + time.toOffsetHours * 3600_000
+
+		console.log("TIME FILTER STATE:", time)
+
+		const debugSample = byTypeAndAltitude.slice(0, 5).map(f => ({
+			id: f.properties.id,
+			type: f.properties.type,
+			validTimeFrom: f.properties.validTimeFrom ?? f.properties.startTime,
+			validTimeTo: f.properties.validTimeTo ?? f.properties.endTime,
+		}))
+		console.log("TIME DEBUG SAMPLE:", debugSample)
 
 		const byTypeAltitudeAndTime = byTypeAndAltitude.filter(f => {
 			const startRaw = f.properties.validTimeFrom ?? f.properties.startTime
 			const endRaw =
 				f.properties.validTimeTo ?? f.properties.endTime ?? startRaw
 
-			const startMs = startRaw ? new Date(startRaw).getTime() : now
-			const endMs = endRaw ? new Date(endRaw).getTime() : startMs
+			// если нет валидной даты — НЕ режем фичу (fail-open),
+			// чтобы не убить все полигоны из‑за формата
+			const startMs = startRaw ? Date.parse(startRaw) : NaN
+			const endMs = endRaw ? Date.parse(endRaw) : NaN
+
+			if (Number.isNaN(startMs) || Number.isNaN(endMs)) {
+				return true
+			}
 
 			// пересечение интервалов [startMs, endMs] и [fromTime, toTime]
 			if (endMs < fromTime) return false
