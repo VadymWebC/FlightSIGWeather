@@ -1,3 +1,4 @@
+// src/components/FiltersPanel.tsx
 import React from "react"
 import type {
 	AltitudeFilterState,
@@ -27,34 +28,22 @@ export const FiltersPanel: React.FC<FiltersPanelProps> = ({
 	}
 
 	const handleMinFL = (e: React.ChangeEvent<HTMLInputElement>) => {
-		const v = e.target.value.trim()
-		const num = v === "" ? 0 : Number(v)
+		const num = Number(e.target.value)
 		onAltitudeChange({ ...altitude, minFL: num })
 	}
 
 	const handleMaxFL = (e: React.ChangeEvent<HTMLInputElement>) => {
-		const v = e.target.value.trim()
-		const num = v === "" ? 480 : Number(v)
+		const num = Number(e.target.value)
 		onAltitudeChange({ ...altitude, maxFL: num })
 	}
 
 	const handleFromHours = (e: React.ChangeEvent<HTMLInputElement>) => {
-		const v = e.target.value.trim()
-		// ограничим диапазон [-24, 0]
-		let num = v === "" ? -24 : Number(v)
-		if (Number.isNaN(num)) num = -24
-		if (num < -24) num = -24
-		if (num > 0) num = 0
+		const num = Number(e.target.value)
 		onTimeChange({ ...time, fromOffsetHours: num })
 	}
 
 	const handleToHours = (e: React.ChangeEvent<HTMLInputElement>) => {
-		const v = e.target.value.trim()
-		// ограничим диапазон [0, +6]
-		let num = v === "" ? 6 : Number(v)
-		if (Number.isNaN(num)) num = 6
-		if (num < 0) num = 0
-		if (num > 6) num = 6
+		const num = Number(e.target.value)
 		onTimeChange({ ...time, toOffsetHours: num })
 	}
 
@@ -62,33 +51,56 @@ export const FiltersPanel: React.FC<FiltersPanelProps> = ({
 		<div
 			style={{
 				position: "absolute",
-				top: 8,
-				right: 8,
-				padding: "8px 10px",
-				background: "rgba(15,23,42,0.85)",
-				color: "white",
-				fontSize: 12,
-				borderRadius: 4,
+				top: 16,
+				right: 16,
+				padding: "16px",
+				background: "white",
+				color: "#1f2937",
+				fontSize: 13,
+				borderRadius: 8,
+				boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
 				zIndex: 2,
-				minWidth: 210,
+				minWidth: 260,
 			}}
 		>
-			<div style={{ fontWeight: 600, marginBottom: 6 }}>Фильтры</div>
+			{/* Title */}
+			<div
+				style={{
+					fontWeight: 600,
+					marginBottom: 12,
+					fontSize: 14,
+					color: "#111827",
+				}}
+			>
+				Layers
+			</div>
 
-			{/* Типы */}
-			<div style={{ marginBottom: 8 }}>
+			{/* Layer toggles */}
+			<div style={{ marginBottom: 16 }}>
 				<label
 					style={{
 						display: "flex",
 						alignItems: "center",
-						gap: 4,
-						marginBottom: 2,
+						gap: 8,
+						marginBottom: 6,
+						cursor: "pointer",
 					}}
 				>
 					<input
 						type="checkbox"
 						checked={layers.showSigmet}
 						onChange={() => handleLayerToggle("showSigmet")}
+						style={{ cursor: "pointer" }}
+					/>
+					<span
+						style={{
+							display: "inline-block",
+							width: 16,
+							height: 16,
+							backgroundColor: "#ef4444",
+							borderRadius: 3,
+							border: "1px solid #b91c1c",
+						}}
 					/>
 					<span>SIGMET</span>
 				</label>
@@ -96,99 +108,196 @@ export const FiltersPanel: React.FC<FiltersPanelProps> = ({
 					style={{
 						display: "flex",
 						alignItems: "center",
-						gap: 4,
-						marginBottom: 2,
+						gap: 8,
+						marginBottom: 6,
+						cursor: "pointer",
 					}}
 				>
 					<input
 						type="checkbox"
 						checked={layers.showAirmet}
 						onChange={() => handleLayerToggle("showAirmet")}
+						style={{ cursor: "pointer" }}
+					/>
+					<span
+						style={{
+							display: "inline-block",
+							width: 16,
+							height: 16,
+							backgroundColor: "#f97316",
+							borderRadius: 3,
+							border: "1px solid #c2410c",
+						}}
 					/>
 					<span>AIRMET</span>
 				</label>
-				<label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+				<label
+					style={{
+						display: "flex",
+						alignItems: "center",
+						gap: 8,
+						cursor: "pointer",
+					}}
+				>
 					<input
 						type="checkbox"
 						checked={layers.showGAirmet}
 						onChange={() => handleLayerToggle("showGAirmet")}
+						style={{ cursor: "pointer" }}
+					/>
+					<span
+						style={{
+							display: "inline-block",
+							width: 16,
+							height: 16,
+							backgroundColor: "#3b82f6",
+							borderRadius: 3,
+							border: "1px solid #1d4ed8",
+						}}
 					/>
 					<span>G-AIRMET</span>
 				</label>
 			</div>
 
-			{/* Высота */}
-			<div style={{ marginBottom: 8 }}>
-				<div style={{ marginBottom: 4 }}>Высота (FL):</div>
-				<div style={{ display: "flex", gap: 4 }}>
+			{/* Altitude Range */}
+			<div style={{ marginBottom: 16 }}>
+				<div
+					style={{
+						fontWeight: 600,
+						marginBottom: 8,
+						fontSize: 13,
+						color: "#374151",
+					}}
+				>
+					Altitude Range
+				</div>
+				<div style={{ marginBottom: 8 }}>
+					<label
+						style={{
+							display: "block",
+							fontSize: 12,
+							color: "#6b7280",
+							marginBottom: 4,
+						}}
+					>
+						Min FL: {altitude.minFL.toLocaleString()} ft
+					</label>
 					<input
-						type="number"
-						placeholder="min"
+						type="range"
+						min="0"
+						max="480"
+						step="10"
 						value={altitude.minFL}
 						onChange={handleMinFL}
 						style={{
-							width: 70,
-							padding: "2px 4px",
-							fontSize: 12,
-							borderRadius: 3,
-							border: "1px solid #4b5563",
-							background: "#020617",
-							color: "white",
+							width: "100%",
+							cursor: "pointer",
 						}}
 					/>
+				</div>
+				<div>
+					<label
+						style={{
+							display: "block",
+							fontSize: 12,
+							color: "#6b7280",
+							marginBottom: 4,
+						}}
+					>
+						Max FL: {altitude.maxFL.toLocaleString()} ft
+					</label>
 					<input
-						type="number"
-						placeholder="max"
+						type="range"
+						min="0"
+						max="480"
+						step="10"
 						value={altitude.maxFL}
 						onChange={handleMaxFL}
 						style={{
-							width: 70,
-							padding: "2px 4px",
-							fontSize: 12,
-							borderRadius: 3,
-							border: "1px solid #4b5563",
-							background: "#020617",
-							color: "white",
+							width: "100%",
+							cursor: "pointer",
 						}}
 					/>
+				</div>
+				<div
+					style={{
+						fontSize: 11,
+						color: "#9ca3af",
+						marginTop: 4,
+					}}
+				>
+					0 ft – 48,000 ft
 				</div>
 			</div>
 
-			{/* Время */}
+			{/* Time Filter */}
 			<div>
-				<div style={{ marginBottom: 4 }}>Время (часы от сейчас):</div>
-				<div style={{ display: "flex", gap: 4 }}>
+				<div
+					style={{
+						fontWeight: 600,
+						marginBottom: 8,
+						fontSize: 13,
+						color: "#374151",
+					}}
+				>
+					Time Filter
+				</div>
+				<div style={{ marginBottom: 8 }}>
+					<label
+						style={{
+							display: "block",
+							fontSize: 12,
+							color: "#6b7280",
+							marginBottom: 4,
+						}}
+					>
+						From: {time.fromOffsetHours}h
+					</label>
 					<input
-						type="number"
+						type="range"
+						min="-24"
+						max="0"
+						step="1"
 						value={time.fromOffsetHours}
 						onChange={handleFromHours}
 						style={{
-							width: 70,
-							padding: "2px 4px",
-							fontSize: 12,
-							borderRadius: 3,
-							border: "1px solid #4b5563",
-							background: "#020617",
-							color: "white",
-						}}
-					/>
-					<input
-						type="number"
-						value={time.toOffsetHours}
-						onChange={handleToHours}
-						style={{
-							width: 70,
-							padding: "2px 4px",
-							fontSize: 12,
-							borderRadius: 3,
-							border: "1px solid #4b5563",
-							background: "#020617",
-							color: "white",
+							width: "100%",
+							cursor: "pointer",
 						}}
 					/>
 				</div>
-				<div style={{ marginTop: 2, fontSize: 11, opacity: 0.8 }}>
-					от -24 до 0 (прошлое), от 0 до +6 (будущее)
+				<div>
+					<label
+						style={{
+							display: "block",
+							fontSize: 12,
+							color: "#6b7280",
+							marginBottom: 4,
+						}}
+					>
+						To: +{time.toOffsetHours}h
+					</label>
+					<input
+						type="range"
+						min="0"
+						max="6"
+						step="1"
+						value={time.toOffsetHours}
+						onChange={handleToHours}
+						style={{
+							width: "100%",
+							cursor: "pointer",
+						}}
+					/>
+				</div>
+				<div
+					style={{
+						fontSize: 11,
+						color: "#9ca3af",
+						marginTop: 4,
+					}}
+				>
+					From -24h to +6h (relative to current time)
 				</div>
 			</div>
 		</div>
