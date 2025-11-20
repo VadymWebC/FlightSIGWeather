@@ -7,7 +7,11 @@ import type {
 import type { NormalizedFeature } from "./awcTypes"
 import { filterAwcFeatures } from "./filterAwcFeatures"
 
-function makeFeature(partial: Partial<NormalizedFeature>): NormalizedFeature {
+// Упрощённая фабрика для тестов: принимаем только properties,
+// внутри достраиваем обязательные поля и кастим через any.
+function makeFeature(
+	props: Partial<NormalizedFeature["properties"]> & { id: string }
+): NormalizedFeature {
 	return {
 		type: "Feature",
 		geometry: {
@@ -23,15 +27,20 @@ function makeFeature(partial: Partial<NormalizedFeature>): NormalizedFeature {
 			],
 		},
 		properties: {
-			id: "test",
+			// базовые значения по умолчанию
+			id: props.id,
 			type: "SIGMET",
+			rawText: "TEST",
+			startTime: undefined,
+			endTime: undefined,
 			minFlightLevel: 0,
 			maxFlightLevel: 480,
 			validTimeFrom: undefined,
 			validTimeTo: undefined,
-			rawText: "TEST",
-			...partial.properties,
-		},
+			hazard: undefined,
+			// перекрываем тем, что передали
+			...props,
+		} as any,
 	} as NormalizedFeature
 }
 
@@ -54,10 +63,12 @@ const baseTime: TimeFilterState = {
 describe("filterAwcFeatures", () => {
 	it("filters by layer type", () => {
 		const sigmet = makeFeature({
-			properties: { id: "sig1", type: "SIGMET" },
+			id: "sig1",
+			type: "SIGMET",
 		})
 		const airmet = makeFeature({
-			properties: { id: "air1", type: "AIRMET" },
+			id: "air1",
+			type: "AIRMET",
 		})
 
 		const result = filterAwcFeatures({
@@ -73,18 +84,14 @@ describe("filterAwcFeatures", () => {
 
 	it("filters by altitude range", () => {
 		const low = makeFeature({
-			properties: {
-				id: "low",
-				minFlightLevel: 0,
-				maxFlightLevel: 100,
-			},
+			id: "low",
+			minFlightLevel: 0,
+			maxFlightLevel: 100,
 		})
 		const high = makeFeature({
-			properties: {
-				id: "high",
-				minFlightLevel: 300,
-				maxFlightLevel: 400,
-			},
+			id: "high",
+			minFlightLevel: 300,
+			maxFlightLevel: 400,
 		})
 
 		const result = filterAwcFeatures({
@@ -104,20 +111,16 @@ describe("filterAwcFeatures", () => {
 
 		// Фича, действительная сейчас
 		const current = makeFeature({
-			properties: {
-				id: "current",
-				validTimeFrom: Math.floor((now - oneHour) / 1000),
-				validTimeTo: Math.floor((now + oneHour) / 1000),
-			},
+			id: "current",
+			validTimeFrom: Math.floor((now - oneHour) / 1000),
+			validTimeTo: Math.floor((now + oneHour) / 1000),
 		})
 
-		// Фича, которая была 10 часов назад и уже закончилась
+		// Фича, которая была 10–12 часов назад и уже закончилась
 		const past = makeFeature({
-			properties: {
-				id: "past",
-				validTimeFrom: Math.floor((now - 12 * oneHour) / 1000),
-				validTimeTo: Math.floor((now - 11 * oneHour) / 1000),
-			},
+			id: "past",
+			validTimeFrom: Math.floor((now - 12 * oneHour) / 1000),
+			validTimeTo: Math.floor((now - 11 * oneHour) / 1000),
 		})
 
 		const result = filterAwcFeatures({
@@ -133,11 +136,9 @@ describe("filterAwcFeatures", () => {
 
 	it("does not cut features without time info", () => {
 		const noTime = makeFeature({
-			properties: {
-				id: "noTime",
-				validTimeFrom: undefined,
-				validTimeTo: undefined,
-			},
+			id: "noTime",
+			validTimeFrom: undefined,
+			validTimeTo: undefined,
 		})
 
 		const result = filterAwcFeatures({
