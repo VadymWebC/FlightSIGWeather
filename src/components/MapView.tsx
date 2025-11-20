@@ -18,6 +18,7 @@ const MapView: React.FC = () => {
 	const mapRef = useRef<MapLibreMap | null>(null)
 	const weatherReadyRef = useRef(false)
 	const lastDataRef = useRef<NormalizedFeatureCollection>(emptyFC)
+	const popupRef = useRef<maplibregl.Popup | null>(null)
 
 	const { loading, error, filtered } = useAwcData()
 
@@ -87,14 +88,14 @@ const MapView: React.FC = () => {
 						"match",
 						["get", "type"],
 						"SIGMET",
-						"#ef4444",
+						"#ef4444", // ярко-красный
 						"AIRMET",
-						"#f97316",
+						"#f97316", // ярко-оранжевый
 						"G_AIRMET",
-						"#3b82f6",
-						"#a3a3a3",
+						"#3b82f6", // ярко-синий
+						"#a3a3a3", // default
 					],
-					"fill-opacity": 0.3,
+					"fill-opacity": 0.4,
 				},
 			})
 
@@ -114,8 +115,61 @@ const MapView: React.FC = () => {
 						"#1d4ed8",
 						"#4b5563",
 					],
-					"line-width": 1,
+					"line-width": 1.2,
 				},
+			})
+
+			// обработка клика по полигонам
+			map.on("click", WEATHER_FILL_LAYER_ID, e => {
+				const feature = e.features && e.features[0]
+				if (!feature) return
+
+				const props = feature.properties || {}
+
+				const type = props.type || "UNKNOWN"
+				const id = props.id || props.icaoId || ""
+				const rawText = props.rawText || props.text || ""
+
+				// чуть подрежем текст, чтобы не улетать на экран
+				const shortText =
+					typeof rawText === "string" && rawText.length > 600
+						? rawText.slice(0, 600) + "…"
+						: rawText
+
+				const html = `
+    <div style="max-width: 320px; font-size: 12px;">
+      <div style="font-weight: 600; margin-bottom: 4px;">
+        ${type}${id ? ` — ${id}` : ""}
+      </div>
+      ${
+				shortText
+					? `<pre style="white-space: pre-wrap; margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">${shortText}</pre>`
+					: "<div>No text</div>"
+			}
+    </div>
+  `
+
+				// определяем координату клика
+				const lngLat = e.lngLat
+
+				// если popup уже есть — переиспользуем
+				if (!popupRef.current) {
+					popupRef.current = new maplibregl.Popup({
+						closeButton: true,
+						closeOnClick: true,
+						maxWidth: "320px",
+					})
+				}
+
+				popupRef.current.setLngLat(lngLat).setHTML(html).addTo(map)
+			})
+
+			// меняем курсор при наведении
+			map.on("mouseenter", WEATHER_FILL_LAYER_ID, () => {
+				map.getCanvas().style.cursor = "pointer"
+			})
+			map.on("mouseleave", WEATHER_FILL_LAYER_ID, () => {
+				map.getCanvas().style.cursor = ""
 			})
 
 			weatherReadyRef.current = true
@@ -123,6 +177,10 @@ const MapView: React.FC = () => {
 		})
 
 		return () => {
+			if (popupRef.current) {
+				popupRef.current.remove()
+				popupRef.current = null
+			}
 			map.remove()
 			mapRef.current = null
 			weatherReadyRef.current = false
