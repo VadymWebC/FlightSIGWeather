@@ -6,8 +6,8 @@ import type {
 	NormalizedFeature,
 	NormalizedFeatureCollection,
 } from "../map/awcTypes"
+import { filterAwcFeatures } from "../map/filterAwcFeatures"
 
-// часы относительно "сейчас", в диапазоне [-24, +6]
 export type TimeFilterState = {
 	fromOffsetHours: number
 	toOffsetHours: number
@@ -103,7 +103,6 @@ export function useAwcData(): UseAwcDataState {
 		}
 	}, [])
 
-	// применение фильтров (тип + высота + время)
 	const filtered: NormalizedFeatureCollection | null = useMemo(() => {
 		if (!rawSigmet && !rawAirsigmet) return null
 
@@ -112,57 +111,12 @@ export function useAwcData(): UseAwcDataState {
 			...(rawAirsigmet?.features || []),
 		]
 
-		const { showSigmet, showAirmet, showGAirmet } = layers
-		const { minFL, maxFL } = altitude
-
-		// 1) тип + высота
-		const byTypeAndAltitude = all.filter(f => {
-			const t = f.properties.type
-
-			if (t === "SIGMET" && !showSigmet) return false
-			if (t === "AIRMET" && !showAirmet) return false
-			if (t === "G_AIRMET" && !showGAirmet) return false
-
-			const min = f.properties.minFlightLevel ?? 0
-			const max = f.properties.maxFlightLevel ?? 480
-
-			if (max < minFL) return false
-			if (min > maxFL) return false
-
-			return true
+		return filterAwcFeatures({
+			all,
+			layers,
+			altitude,
+			time,
 		})
-
-		// 2) время
-		const now = Date.now()
-		const fromTime = now + time.fromOffsetHours * 3600_000
-		const toTime = now + time.toOffsetHours * 3600_000
-
-		const byTypeAltitudeAndTime = byTypeAndAltitude.filter(f => {
-			// validTimeFrom / validTimeTo — UNIX seconds (см. твой лог)
-			const startSec =
-				f.properties.validTimeFrom ?? f.properties.startTime ?? null
-			const endSec =
-				f.properties.validTimeTo ?? f.properties.endTime ?? startSec
-
-			if (startSec == null || endSec == null) {
-				// нет информации — не режем по времени
-				return true
-			}
-
-			const startMs = startSec * 1000
-			const endMs = endSec * 1000
-
-			// пересечение интервалов [startMs, endMs] и [fromTime, toTime]
-			if (endMs < fromTime) return false
-			if (startMs > toTime) return false
-
-			return true
-		})
-
-		return {
-			type: "FeatureCollection",
-			features: byTypeAltitudeAndTime,
-		}
 	}, [rawSigmet, rawAirsigmet, layers, altitude, time])
 
 	return {
